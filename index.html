@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG MV 网页存档转移(实验性)</title>
+    <script src="peer.min.js"></script>
+</head>
+<body style="zoom: 1.5;">
+    <div id="f">
+        <input type="text" placeholder="输入id" id="a"><br>
+        <button onclick="cj()">创建id</button>
+        <button onclick="lj()">连接id</button><br>    
+    </div>
+    <span id="b"></span>
+    <div hidden id="c">
+        <hr>
+        <textarea  id="g" cols="25" rows="1"></textarea><br><button onclick="fs()">发送</button>
+        <button onclick="fscd()">发送存档数据</button>
+    </div>
+    <hr>
+    <pre style="height: 100px;overflow-y: scroll;" id="pre">消息：</pre>
+    <div hidden id="d">
+        <hr>    
+        <button onclick="ck()">查看</button>
+        <button onclick="xrcd()">写入存档（会覆盖原存档）</button>
+        <button onclick="xrjtb()">写入剪切板</button>
+    </div>
+    <hr>
+    <textarea  id="e" cols="30" rows="5" hidden></textarea>
+</body>
+<script>
+function ck(){
+    e.hidden = ''
+    e.value = JSON.stringify(json);
+}
+function xrcd(){
+    for(var i in json){
+        localStorage[i] = json[i];
+    }
+}
+function xrjtb(){
+    if(typeof navigator.clipboard === "object"){
+        navigator.clipboard.writeText(JSON.stringify(json)).then(function(){
+            write("复制成功")
+        }).catch(function(){
+            write("复制失败")
+        })
+    }else{
+        var t = document.createElement('textarea');
+        t.value = JSON.stringify(json);
+        document.body.appendChild(t);
+        t.select();
+        if(document.execCommand('Copy')){
+             write("复制成功")
+        }else{
+            write("复制失败")
+        }
+        document.body.removeChild(t);
+    }
+}
+function randstr(){
+   return Math.random().toString(36).substring(2,12)
+}
+function hashb(b,str) {
+    var hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash * b) ^ str.charCodeAt(i);
+    }
+    return hash >>> 0;
+}
+</script>
+<script>
+var $id,peer,conn,fd=0,json={};
+function write(str){
+    pre.innerHTML+='\n'+str;
+    pre.scrollTop=99999
+}
+function fdz(){
+    var x = Date.now();
+    if(x - fd < 1000) return (fd = x,write('防抖中...'));
+    fd = x;
+}
+function fscd(){
+    var obj = {};
+    for(var i in localStorage){
+        if (i.indexOf("RPG ") == 0) {
+            obj[i] = localStorage[i];            
+        }
+    }
+    conn && conn.send(obj);
+    write('发送成功')
+}
+function fs(){
+    g.value && conn && conn.send(g.value);
+    g.value = '';
+
+}
+function cj(){
+    fdz();
+    if($id && !confirm('是否需要重新创建id')) return
+    var id = a.value || randstr();
+    a.value = id;
+    var _id = 'Reinex64' + '-' + hashb(33,id).toString(36) + '-' + hashb(37,id).toString(36);
+    peer = new Peer(_id);
+    peer.on('open',function(){
+        $id = id;
+        b.innerText ='我的ID是：' + id;
+        f.hidden = 'hidden'
+        write('创建成功')
+    }).on('connection',function(con){
+        c.hidden = ''
+        conn = con;
+        conn.on('data',handleMessage).on('error',function(err){
+            write(err);
+        }) 
+        write('有设备连接')
+    }).on('error',function(err){
+       if(err.type == 'unavailable-id'){ 
+            return write('id：' + a.value+ '被占用，创建失败') 
+        }
+        write(err)
+    })
+    peer = null;
+    conn = null;
+}
+function handleMessage(data){
+    if(typeof data === 'string') {
+        var s = data.replace(/&/g, '&amp;')
+        s = s.replace(/</g, '&lt;')
+        write('<textarea>' +  s + '</textarea>');
+    }else if(typeof data === 'object'){
+        json = data
+        d.hidden = '';
+    }
+}
+function connect0(){
+    if(!a.value) return write('请输入id');
+    var id = a.value
+    var _id = 'Reinex64' + '-' + hashb(33,id).toString(36) + '-' + hashb(37,id).toString(36);
+    conn = peer.connect(_id);
+    conn.on('open',function(){
+        b.innerText ='目标ID是：' + id;
+        f.hidden = 'hidden'
+        c.hidden = ''
+        write('连接成功')
+    }).on('data',handleMessage).on('error',function(err){
+        write(err)
+    }) 
+}
+function lj(){
+    fdz();
+    if(peer) connect0();
+    peer = new Peer();
+    peer.on('open',connect0).on('error',function(err){
+        peer = null;
+        conn = null;
+        if(err.type == 'peer-unavailable' || err.type == 'unavailable-id') return write('无法连接' + a.value);
+        write(err)
+    })
+}
+</script>
+</html>
