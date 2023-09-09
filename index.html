@@ -38,6 +38,7 @@ function xrcd(){
     for(var i in json){
         localStorage[i] = json[i];
     }
+    write("写入成功")
 }
 function xrjtb(){
     if(typeof navigator.clipboard === "object"){
